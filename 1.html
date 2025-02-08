@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>PDF文件处理工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .info-box {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF文件处理工具</h1>
+        
+        <div id="uploadSection">
+            <h2>上传PDF文件</h2>
+            <input type="file" id="pdfFile" accept=".pdf">
+            <button onclick="uploadFile()">上传</button>
+        </div>
+
+        <div id="decryptSection" style="display: none;">
+            <h2>PDF文件已加密</h2>
+            <input type="password" id="password" placeholder="请输入密码">
+            <button onclick="decryptFile()">解密</button>
+        </div>
+
+        <div id="infoSection" class="info-box" style="display: none;">
+            <h2>PDF文件信息</h2>
+            <p>标题：<span id="title"></span></p>
+            <p>作者：<span id="author"></span></p>
+            <p>页数：<span id="pages"></span></p>
+        </div>
+    </div>
+
+    <script>
+        let currentFile = null;
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('pdfFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('请选择PDF文件');
+                return;
+            }
+            currentFile = file;
+
+            const formData = new FormData();
+            formData.append('pdf', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.encrypted) {
+                    document.getElementById('decryptSection').style.display = 'block';
+                    document.getElementById('infoSection').style.display = 'none';
+                } else {
+                    showPDFInfo(data.info);
+                    document.getElementById('decryptSection').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('上传失败:', error);
+                alert('上传失败：' + (error.message || '未知错误'));
+            }
+        }
+
+        async function decryptFile() {
+            const password = document.getElementById('password').value;
+            if (!password) {
+                alert('请输入密码');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('pdf', currentFile);
+            formData.append('password', password);
+
+            try {
+                const response = await fetch('/decrypt', {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+
+                if (data.success) {
+                    showPDFInfo(data.info);
+                    document.getElementById('decryptSection').style.display = 'none';
+                } else {
+                    alert(data.error || '密码错误');
+                }
+            } catch (error) {
+                console.error('解密失败:', error);
+                alert('解密失败：' + (error.message || '未知错误'));
+            }
+        }
+
+        function showPDFInfo(info) {
+            document.getElementById('infoSection').style.display = 'block';
+            document.getElementById('title').textContent = info.title;
+            document.getElementById('author').textContent = info.author;
+            document.getElementById('pages').textContent = info.pages;
+        }
+    </script>
+</body>
+</html>
