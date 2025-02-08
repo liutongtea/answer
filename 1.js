@@ -1,7 +1,11 @@
 const express = require('express');
 const multer = require('multer');
-const { PDFDocument } = require('pdf-lib');
-const cors = require('cors')
+const pdfjsLib = require('pdfjs-dist');
+const cors = require('cors');
+
+// 设置 PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/build/pdf.worker.js');
+
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -38,16 +42,22 @@ function validatePDF(req, res, next) {
 app.post('/upload', upload.single('pdf'), validatePDF, async (req, res) => {
     try {
         const pdfBuffer = req.file.buffer;
-        const pdfDoc = await PDFDocument.load(pdfBuffer);
+        const data = new Uint8Array(pdfBuffer);
+        
+        const loadingTask = pdfjsLib.getDocument({data});
+        const pdfDocument = await loadingTask.promise;
         
         res.json({
             encrypted: false,
-            info: extractPDFInfo(pdfDoc)
+            info: {
+                pages: pdfDocument.numPages,
+                password: null
+            }
         });
     } catch (error) {
         console.error('PDF处理错误:', error);
         
-        if (error.message.includes('encrypted')) {
+        if (error.name === 'PasswordException') {
             res.json({ 
                 encrypted: true,
                 message: '文件已加密，请提供密码'
@@ -65,7 +75,7 @@ app.post('/upload', upload.single('pdf'), validatePDF, async (req, res) => {
 app.post('/decrypt', upload.single('pdf'), validatePDF, async (req, res) => {
     try {
         const pdfBuffer = req.file.buffer;
-        const password = req.body.password || req.query.password;
+        const password = req.body.password;
         
         if (!password) {
             return res.status(400).json({ 
@@ -74,30 +84,29 @@ app.post('/decrypt', upload.single('pdf'), validatePDF, async (req, res) => {
             });
         }
 
-        const pdfDoc = await PDFDocument.load(pdfBuffer, { password });
+        const data = new Uint8Array(pdfBuffer);
+        const loadingTask = pdfjsLib.getDocument({
+            data,
+            password
+        });
+        
+        const pdfDocument = await loadingTask.promise;
         
         res.json({
             success: true,
-            info: extractPDFInfo(pdfDoc)
+            info: {
+                pages: pdfDocument.numPages,
+                password: password
+            }
         });
     } catch (error) {
         console.error('解密失败:', error);
         res.status(400).json({ 
             success: false, 
-            error: error.message 
+            error: '密码错误' 
         });
     }
 });
-
-// 提取PDF信息
-function extractPDFInfo(pdfDoc) {
-    return {
-        isEncrypted: pdfDoc.isEncrypted,
-        title: pdfDoc.getTitle() || '无',
-        author: pdfDoc.getAuthor() || '无',
-        pages: pdfDoc.getPageCount()
-    };
-}
 
 // 添加请求日志中间件
 app.use((req, res, next) => {

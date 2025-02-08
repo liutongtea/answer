@@ -9,22 +9,65 @@
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+            background-color: #f5f5f5;
         }
         .container {
+            background-color: white;
             border: 1px solid #ddd;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
             padding: 20px;
-            border-radius: 5px;
+            text-align: center;
+            margin: 20px 0;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .upload-area:hover {
+            border-color: #666;
+            background-color: #f0f0f0;
         }
         .info-box {
             margin-top: 20px;
-            padding: 10px;
-            background: #f5f5f5;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
         }
         .error {
-            color: red;
+            color: #dc3545;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: #f8d7da;
         }
         .success {
-            color: green;
+            color: #28a745;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: #d4edda;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        input[type="password"] {
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
         }
     </style>
 </head>
@@ -32,7 +75,7 @@
     <div class="container">
         <h1>PDF文件处理工具</h1>
         
-        <div id="uploadSection">
+        <div class="upload-area" id="uploadSection">
             <h2>上传PDF文件</h2>
             <input type="file" id="pdfFile" accept=".pdf">
             <button onclick="uploadFile()">上传</button>
@@ -46,9 +89,10 @@
 
         <div id="infoSection" class="info-box" style="display: none;">
             <h2>PDF文件信息</h2>
-            <p>标题：<span id="title"></span></p>
-            <p>作者：<span id="author"></span></p>
             <p>页数：<span id="pages"></span></p>
+            <p id="passwordInfo" style="display: none;">
+                密码：<span id="password-display"></span>
+            </p>
         </div>
     </div>
 
@@ -59,7 +103,7 @@
             const fileInput = document.getElementById('pdfFile');
             const file = fileInput.files[0];
             if (!file) {
-                alert('请选择PDF文件');
+                showMessage('请选择PDF文件', 'error');
                 return;
             }
             currentFile = file;
@@ -82,20 +126,22 @@
                 if (data.encrypted) {
                     document.getElementById('decryptSection').style.display = 'block';
                     document.getElementById('infoSection').style.display = 'none';
+                    showMessage('文件已加密，请输入密码', 'info');
                 } else {
                     showPDFInfo(data.info);
                     document.getElementById('decryptSection').style.display = 'none';
+                    showMessage('文件上传成功', 'success');
                 }
             } catch (error) {
                 console.error('上传失败:', error);
-                alert('上传失败：' + (error.message || '未知错误'));
+                showMessage('上传失败：' + (error.message || '未知错误'), 'error');
             }
         }
 
         async function decryptFile() {
             const password = document.getElementById('password').value;
             if (!password) {
-                alert('请输入密码');
+                showMessage('请输入密码', 'error');
                 return;
             }
 
@@ -118,20 +164,37 @@
                 if (data.success) {
                     showPDFInfo(data.info);
                     document.getElementById('decryptSection').style.display = 'none';
+                    showMessage('解密成功', 'success');
                 } else {
-                    alert(data.error || '密码错误');
+                    showMessage(data.error || '密码错误', 'error');
                 }
             } catch (error) {
                 console.error('解密失败:', error);
-                alert('解密失败：' + (error.message || '未知错误'));
+                showMessage('解密失败：' + (error.message || '未知错误'), 'error');
             }
         }
 
         function showPDFInfo(info) {
             document.getElementById('infoSection').style.display = 'block';
-            document.getElementById('title').textContent = info.title;
-            document.getElementById('author').textContent = info.author;
             document.getElementById('pages').textContent = info.pages;
+            
+            if (info.password) {
+                document.getElementById('passwordInfo').style.display = 'block';
+                document.getElementById('password-display').textContent = info.password;
+            } else {
+                document.getElementById('passwordInfo').style.display = 'none';
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.textContent = message;
+            messageDiv.className = type;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(messageDiv, document.getElementById('uploadSection'));
+            
+            setTimeout(() => messageDiv.remove(), 3000);
         }
     </script>
 </body>
